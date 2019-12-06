@@ -1,5 +1,5 @@
 import telebot
-from flask import Flask
+from flask import Flask, request
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from telebot import types
@@ -188,6 +188,24 @@ def button_handler(message):
 @app.route('/')
 def hello_world():
     return 'Hello World!'
+
+
+@app.route('/' + Config.TOKEN, methods=['POST'])
+def get_message():
+    update = telebot.types.Update.de_json(request.stream.read().decode("utf-8"))
+    status = bot.process_new_updates([update])
+    return "Hello from Heroku!", 200
+
+
+@app.route('/set_webhook/', methods=['GET'])
+def get_index():
+    status = bot.set_webhook(url="{link}/{token}".format(link=LINK, token=Config.TOKEN))
+    return 'ПРИВЕТ{}'.format(status), 200
+
+
+@app.route('/', methods=['GET'])
+def index():
+    return 'ПРИВЕТ{}'.format(Config.TOKEN)
 
 
 if __name__ == '__main__':
