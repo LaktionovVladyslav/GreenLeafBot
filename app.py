@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from telebot import types
 
 from config import Config
-from models import User, PlantCulture
+from models import User, PlantCulture, Orders
 
 engine = create_engine(Config.DATABASE_URI)
 Session = sessionmaker(bind=engine)
@@ -84,6 +84,24 @@ def command_click_inline(call):
                           reply_markup=gen_inline_keyboard(items, 3))
 
 
+@bot.callback_query_handler(func=lambda call: "del_" in str(call.data))
+def command_click_inline(call):
+    user = log_in(user=call.from_user)
+    plant_culture_id = call.data.split('_')[1]
+    plant_culture = session.query(PlantCulture). \
+        filter(PlantCulture.id == plant_culture_id).first()
+    user.orders.remove(plant_culture)
+    session.commit()
+    if user.orders:
+        text = 'Ваша корзина\n'
+        items = [dict(text="{} {}грн ❌".format(order.name, order.price), value="del_{}".format(
+            order.id,
+        )) for order
+                 in user.orders]
+        bot.edit_message_text(chat_id=call.from_user.id, message_id=call.message.message_id, text=text,
+                              reply_markup=gen_inline_keyboard(items, count=3))
+
+
 @bot.callback_query_handler(func=lambda call: "basket_" in str(call.data))  # Готово
 def command_click_inline(call):
     user = log_in(user=call.from_user)
@@ -108,10 +126,10 @@ def command_click_inline(call):
     plant_culture_id = call.data.split('_')[1]
     plant_culture = session.query(PlantCulture). \
         filter(PlantCulture.id == plant_culture_id).first()
-    text = "{name}\n{price}\n{description}".format(
+    text = "{name} {price} {description}".format(
         name=plant_culture.name,
         price=plant_culture.price,
-        description=plant_culture.description
+        description=plant_culture.description or 'Описание'
     )
     items = [dict(text="Добавить в корзину", value="basket_{}".format(
         plant_culture.id,
@@ -129,7 +147,7 @@ def button_handler(message):
     )) for plant_culture
              in session.query(PlantCulture).all()]
     text = 'Позиции'
-    bot.send_message(user.id, text=text, reply_markup=gen_inline_keyboard(items, 3))
+    bot.send_message(user.id, text=text, reply_markup=gen_inline_keyboard(items, count=2))
 
 
 @bot.message_handler(func=lambda message: 'Корзина' in str(message.text))
@@ -141,7 +159,11 @@ def button_handler(message):
             order.id,
         )) for order
                  in user.orders]
-        bot.send_message(user.id, text=text, reply_markup=gen_inline_keyboard(items, count=3))
+        items.append(dict(text="Очистить корзину", value="clear_basket"))
+        bot.send_message(user.id, text=text, reply_markup=gen_inline_keyboard(items, count=2))
+    else:
+        text = 'Ваша корзина пустая'
+        bot.send_message(user.id, text=text)
 
 
 @bot.message_handler(func=lambda message: 'Сделать заказ' in str(message.text))
@@ -152,6 +174,14 @@ def button_handler(message):
         for order in user.orders:
             text += '- {} {}грн\n'.format(order.name, order.price)
         text += "Всего {}грн".format(sum([order.price for order in user.orders]))
+        items = [dict(text="{} {}грн ❌".format(order.name, order.price), value="del_{}".format(
+            order.id,
+        )) for order
+                 in user.orders]
+        items.append(dict(text="Очистить корзину", value="clear_basket"))
+        bot.send_message(user.id, text=text, reply_markup=gen_inline_keyboard(items, count=2))
+    else:
+        text = 'Ваша корзина пустая'
         bot.send_message(user.id, text=text)
 
 
