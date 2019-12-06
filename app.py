@@ -199,7 +199,7 @@ def get_message():
 
 @app.route('/set_webhook/', methods=['GET'])
 def get_index():
-    status = bot.set_webhook(url="{link}/{token}".format(link=LINK, token=Config.TOKEN))
+    status = bot.set_webhook(url="{link}/{token}".format(link=Config.LINK, token=Config.TOKEN))
     return 'ПРИВЕТ{}'.format(status), 200
 
 
